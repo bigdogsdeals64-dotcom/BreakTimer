@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#3b2a00" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Break Timer</title>
+  <style>
+    :root {
+      --bg: #111;
+      --card: rgba(35, 28, 18, 0.88);
+      --card-2: rgba(18, 18, 18, 0.86);
+      --text: #fff6dc;
+      --muted: #d2c39c;
+      --gold: #ffb000;
+      --gold-2: #ffcf66;
+      --danger: #ff4d4d;
+      --ok: #21d07a;
+      --line: rgba(255, 176, 0, 0.28);
+      --shadow: rgba(0,0,0,.45);
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(255,176,0,.18), transparent 35%),
+        linear-gradient(135deg, #050505 0%, #19140a 55%, #050505 100%);
+      color: var(--text);
+      overscroll-behavior: none;
+    }
+
+    body { display: flex; justify-content: center; align-items: stretch; padding: 14px; }
+
+    .app {
+      width: 100%;
+      max-width: 520px;
+      min-height: calc(100vh - 28px);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: linear-gradient(180deg, var(--card), var(--card-2));
+      box-shadow: 0 22px 70px var(--shadow);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .top { padding: 22px 20px 14px; border-bottom: 1px solid var(--line); background: rgba(0,0,0,.18); }
+    h1 { margin: 0; font-size: 28px; letter-spacing: .5px; color: var(--gold-2); }
+    .subtitle { margin-top: 6px; color: var(--muted); font-size: 14px; line-height: 1.35; }
+    .timer-wrap { padding: 28px 18px 18px; text-align: center; }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 34px;
+      padding: 8px 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(0,0,0,.2);
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); box-shadow: 0 0 12px currentColor; }
+    .status.running .dot { background: var(--ok); }
+    .status.warning .dot { background: var(--gold); }
+    .status.done .dot { background: var(--danger); }
+
+    .timer {
+      font-size: clamp(76px, 22vw, 124px);
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -5px;
+      color: #fff;
+      text-shadow: 0 6px 28px rgba(255,176,0,.22);
+      margin: 10px 0 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .small-line { color: var(--muted); font-size: 14px; min-height: 20px; }
+    .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 18px; }
+    button, input, textarea { font-family: inherit; font-size: 16px; }
+
+    button {
+      border: 0;
+      border-radius: 18px;
+      padding: 16px 12px;
+      font-weight: 900;
+      cursor: pointer;
+      min-height: 58px;
+      color: #130d00;
+      background: linear-gradient(180deg, var(--gold-2), var(--gold));
+      box-shadow: 0 10px 24px rgba(0,0,0,.28);
+    }
+
+    button:active { transform: translateY(1px); box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+    button.secondary { background: rgba(255,255,255,.08); color: var(--text); border: 1px solid var(--line); }
+    button.danger { background: linear-gradient(180deg, #ff8585, #ff3f3f); color: #1a0000; }
+    button.full { grid-column: 1 / -1; }
+
+    .panel { margin: 0 18px 18px; padding: 16px; border: 1px solid var(--line); border-radius: 22px; background: rgba(0,0,0,.18); }
+    .panel h2 { margin: 0 0 10px; font-size: 17px; color: var(--gold-2); }
+    label { display: block; color: var(--muted); font-size: 13px; margin: 12px 0 6px; font-weight: 700; }
+
+    input, textarea {
+      width: 100%;
+      border: 1px solid rgba(255,176,0,.3);
+      border-radius: 14px;
+      background: rgba(0,0,0,.34);
+      color: var(--text);
+      padding: 13px 12px;
+      outline: none;
+    }
+
+    textarea { min-height: 82px; resize: vertical; }
+    .mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+    .footer { padding: 0 18px 18px; color: var(--muted); font-size: 12px; line-height: 1.45; text-align: center; }
+    .wake { color: var(--gold-2); font-weight: 800; }
+
+    @media (max-width: 360px) {
+      body { padding: 8px; }
+      .app { min-height: calc(100vh - 16px); border-radius: 22px; }
+      .controls { gap: 9px; padding: 14px; }
+      button { min-height: 54px; padding: 13px 8px; }
+      .timer { letter-spacing: -3px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="top">
+      <h1>Break Timer</h1>
+      <div class="subtitle">10-minute preload break timer with warning, loud alert, saved phone numbers, and SMS shortcut.</div>
+    </section>
+
+    <section class="timer-wrap">
+      <div id="status" class="status">
+        <span class="dot"></span>
+        <span id="statusText">Ready</span>
+      </div>
+      <div id="timer" class="timer">10:00</div>
+      <div id="smallLine" class="small-line">Warning sounds at 2:10 remaining.</div>
+    </section>
+
+    <section class="controls">
+      <button id="startBtn">Start Break</button>
+      <button id="pauseBtn" class="secondary">Pause</button>
+      <button id="resetBtn" class="danger">Reset</button>
+      <button id="testBtn" class="secondary">Test Sound</button>
+      <button id="smsBtn" class="full">Text Break Started</button>
+    </section>
+
+    <section class="panel">
+      <h2>Settings</h2>
+
+      <label for="minutes">Break Length</label>
+      <input id="minutes" type="number" min="1" max="60" step="1" value="10" />
+
+      <label for="phones">Phone Numbers</label>
+      <input id="phones" type="text" placeholder="Example: 8655551234, 8655555678" />
+
+      <label for="message">Text Message</label>
+      <textarea id="message">Break started. Break is 10 minutes. Timer has started now.</textarea>
+
+      <div class="mini-grid">
+        <button id="saveBtn" class="secondary">Save Settings</button>
+        <button id="wakeBtn" class="secondary">Keep Screen Awake</button>
+      </div>
+    </section>
+
+    <div class="footer">
+      <span id="wakeStatus">Screen wake lock: on while app is open</span><br />
+      Android APK version. Keep this screen open while break is running.
+    </div>
+  </main>
+
+  <script>
+    const timerEl = document.getElementById('timer');
+    const statusEl = document.getElementById('status');
+    const statusText = document.getElementById('statusText');
+    const smallLine = document.getElementById('smallLine');
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const testBtn = document.getElementById('testBtn');
+    const smsBtn = document.getElementById('smsBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const wakeBtn = document.getElementById('wakeBtn');
+    const minutesInput = document.getElementById('minutes');
+    const phonesInput = document.getElementById('phones');
+    const messageInput = document.getElementById('message');
+    const wakeStatus = document.getElementById('wakeStatus');
+
+    let totalSeconds = 600;
+    let remaining = 600;
+    let running = false;
+    let interval = null;
+    let endTime = null;
+    let warned = false;
+    let audioCtx = null;
+
+    function loadSettings() {
+      const saved = JSON.parse(localStorage.getItem('breakTimerSettings') || '{}');
+      if (saved.minutes) minutesInput.value = saved.minutes;
+      if (saved.phones) phonesInput.value = saved.phones;
+      if (saved.message) messageInput.value = saved.message;
+      setTotalFromInput();
+    }
+
+    function saveSettings() {
+      localStorage.setItem('breakTimerSettings', JSON.stringify({
+        minutes: Number(minutesInput.value || 10),
+        phones: phonesInput.value.trim(),
+        message: messageInput.value
+      }));
+      smallLine.textContent = 'Settings saved.';
+      setTimeout(() => updateSmallLine(), 1400);
+    }
+
+    function setTotalFromInput() {
+      const mins = Math.max(1, Math.min(60, Number(minutesInput.value || 10)));
+      totalSeconds = mins * 60;
+      if (!running) {
+        remaining = totalSeconds;
+        updateDisplay();
+      }
+    }
+
+    function format(seconds) {
+      seconds = Math.max(0, Math.ceil(seconds));
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return `${m}:${String(s).padStart(2, '0')}`;
+    }
+
+    function updateStatus(type, text) {
+      statusEl.className = 'status' + (type ? ` ${type}` : '');
+      statusText.textContent = text;
+    }
+
+    function updateSmallLine() {
+      if (running) {
+        smallLine.textContent = `Break ends at ${new Date(endTime).toLocaleTimeString([], {hour: 'numeric', minute:'2-digit'})}.`;
+      } else {
+        smallLine.textContent = 'Warning sounds at 2:10 remaining.';
+      }
+    }
+
+    function updateDisplay() {
+      timerEl.textContent = format(remaining);
+      if (running) updateStatus(remaining <= 130 ? 'warning' : 'running', remaining <= 130 ? 'Almost Over' : 'Running');
+      else if (remaining <= 0) updateStatus('done', 'Break Over');
+      else updateStatus('', 'Ready');
+    }
+
+    function initAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function beep(pattern = 'normal') {
+      initAudio();
+      const now = audioCtx.currentTime;
+      const tones = pattern === 'done'
+        ? [[0, 880, .22], [.28, 880, .22], [.56, 660, .35], [1.05, 990, .55]]
+        : [[0, 740, .18], [.24, 950, .18], [.48, 740, .18]];
+
+      tones.forEach(([delay, freq, dur]) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'square';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.0001, now + delay);
+        gain.gain.exponentialRampToValueAtTime(0.65, now + delay + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + dur);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now + delay);
+        osc.stop(now + delay + dur + .04);
+      });
+
+      if (navigator.vibrate) {
+        navigator.vibrate(pattern === 'done' ? [300, 120, 300, 120, 600] : [200, 100, 200]);
+      }
+    }
+
+    function tick() {
+      remaining = Math.max(0, Math.round((endTime - Date.now()) / 1000));
+
+      if (!warned && remaining <= 130 && remaining > 0) {
+        warned = true;
+        beep('warning');
+        smallLine.textContent = '2:10 remaining. Start wrapping up break.';
+      }
+
+      if (remaining <= 0) {
+        stopInterval();
+        running = false;
+        remaining = 0;
+        updateDisplay();
+        updateStatus('done', 'Break Over');
+        smallLine.textContent = 'Break is over.';
+        beep('done');
+        return;
+      }
+
+      updateDisplay();
+      updateSmallLine();
+    }
+
+    function stopInterval() {
+      if (interval) clearInterval(interval);
+      interval = null;
+    }
+
+    function startTimer() {
+      initAudio();
+      setTotalFromInput();
+
+      if (!running) {
+        running = true;
+        warned = remaining <= 130;
+        endTime = Date.now() + remaining * 1000;
+        stopInterval();
+        interval = setInterval(tick, 250);
+        tick();
+      }
+    }
+
+    function pauseTimer() {
+      if (!running) return;
+      running = false;
+      stopInterval();
+      remaining = Math.max(0, Math.round((endTime - Date.now()) / 1000));
+      updateDisplay();
+      updateStatus('', 'Paused');
+      smallLine.textContent = 'Timer paused.';
+    }
+
+    function resetTimer() {
+      running = false;
+      stopInterval();
+      warned = false;
+      setTotalFromInput();
+      updateDisplay();
+      updateSmallLine();
+    }
+
+    function openSms() {
+      const phones = phonesInput.value
+        .split(',')
+        .map(p => p.trim())
+        .filter(Boolean)
+        .join(',');
+      const body = encodeURIComponent(messageInput.value || 'Break started. Timer has started now.');
+      if (!phones) {
+        smallLine.textContent = 'Enter at least one phone number first.';
+        return;
+      }
+      window.location.href = `sms:${phones}?body=${body}`;
+    }
+
+    startBtn.addEventListener('click', startTimer);
+    pauseBtn.addEventListener('click', pauseTimer);
+    resetBtn.addEventListener('click', resetTimer);
+    testBtn.addEventListener('click', () => beep('done'));
+    smsBtn.addEventListener('click', openSms);
+    saveBtn.addEventListener('click', saveSettings);
+    wakeBtn.addEventListener('click', () => {
+      wakeStatus.textContent = 'Screen stays awake while this APK app is open.';
+    });
+    minutesInput.addEventListener('change', () => {
+      setTotalFromInput();
+      saveSettings();
+    });
+
+    loadSettings();
+    updateDisplay();
+  </script>
+</body>
+</html>
