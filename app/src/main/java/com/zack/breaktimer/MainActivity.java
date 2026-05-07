@@ -3,8 +3,10 @@ package com.zack.breaktimer;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
+import android.util.Base64;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceRequest;
@@ -13,13 +15,26 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+
 public class MainActivity extends Activity {
     private WebView webView;
+    private MediaPlayer mediaPlayer;
+    private File alarmFile;
 
     public class AndroidBridge {
         @JavascriptInterface
         public void sendSms(String phoneNumbers, String message) {
             runOnUiThread(() -> openSms(phoneNumbers, message));
+        }
+
+        @JavascriptInterface
+        public void playAlarmSound() {
+            runOnUiThread(() -> playAlarm());
         }
     }
 
@@ -27,6 +42,8 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+        prepareAlarmFile();
 
         webView = new WebView(this);
         setContentView(webView);
@@ -64,6 +81,62 @@ public class MainActivity extends Activity {
         });
 
         webView.loadUrl("file:///android_asset/index.html");
+    }
+
+    private void prepareAlarmFile() {
+        try {
+            InputStream inputStream = getAssets().open("alarm2.b64");
+            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+            StringBuilder builder = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                builder.append(line.trim());
+            }
+            reader.close();
+
+            byte[] audioBytes = Base64.decode(builder.toString(), Base64.DEFAULT);
+            alarmFile = new File(getCacheDir(), "break_timer_alarm.mp3");
+            FileOutputStream outputStream = new FileOutputStream(alarmFile);
+            outputStream.write(audioBytes);
+            outputStream.flush();
+            outputStream.close();
+        } catch (Exception e) {
+            alarmFile = null;
+        }
+    }
+
+    private void playAlarm() {
+        try {
+            if (alarmFile == null || !alarmFile.exists()) {
+                prepareAlarmFile();
+            }
+
+            if (alarmFile == null || !alarmFile.exists()) {
+                Toast.makeText(this, "Custom alarm file not found.", Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            if (mediaPlayer != null) {
+                try {
+                    mediaPlayer.stop();
+                    mediaPlayer.release();
+                } catch (Exception ignored) {}
+                mediaPlayer = null;
+            }
+
+            mediaPlayer = new MediaPlayer();
+            mediaPlayer.setDataSource(alarmFile.getAbsolutePath());
+            mediaPlayer.setOnCompletionListener(mp -> {
+                try {
+                    mp.release();
+                } catch (Exception ignored) {}
+                mediaPlayer = null;
+            });
+            mediaPlayer.prepare();
+            mediaPlayer.start();
+        } catch (Exception e) {
+            Toast.makeText(this, "Could not play custom alarm.", Toast.LENGTH_LONG).show();
+        }
     }
 
     private boolean isSmsUrl(String url) {
@@ -108,5 +181,16 @@ public class MainActivity extends Activity {
         } else {
             super.onBackPressed();
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (mediaPlayer != null) {
+            try {
+                mediaPlayer.release();
+            } catch (Exception ignored) {}
+            mediaPlayer = null;
+        }
+        super.onDestroy();
     }
 }
