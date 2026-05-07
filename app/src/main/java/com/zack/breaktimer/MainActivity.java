@@ -25,6 +25,7 @@ public class MainActivity extends Activity {
     private WebView webView;
     private volatile boolean alarmPlaying = false;
     private byte[] alarmPcmBytes = null;
+    private static final int ALARM_SAMPLE_RATE = 48000;
 
     public class AndroidBridge {
         @JavascriptInterface
@@ -84,7 +85,7 @@ public class MainActivity extends Activity {
 
     private void loadPcmAlarm() {
         try {
-            InputStream inputStream = getAssets().open("alarm_pcm_16k.b64");
+            InputStream inputStream = getAssets().open("alarm_pcm_48k.b64");
             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
             StringBuilder builder = new StringBuilder();
             String line;
@@ -109,35 +110,6 @@ public class MainActivity extends Activity {
         return samples;
     }
 
-    private short[] makeEmergencyTone() {
-        final int sampleRate = 16000;
-        final double durationSeconds = 3.2;
-        final int samples = (int) (sampleRate * durationSeconds);
-        final int rampSamples = (int) (sampleRate * 0.025);
-        short[] buffer = new short[samples];
-
-        for (int i = 0; i < samples; i++) {
-            double t = i / (double) sampleRate;
-            double sweepA = 760.0 + 520.0 * (0.5 + 0.5 * Math.sin(2.0 * Math.PI * 2.15 * t));
-            double sweepB = 1120.0 + 420.0 * (0.5 + 0.5 * Math.sin(2.0 * Math.PI * 3.05 * t));
-            double pulse = (Math.sin(2.0 * Math.PI * 7.0 * t) > -0.15) ? 1.0 : 0.18;
-            double wave = Math.sin(2.0 * Math.PI * sweepA * t) * 0.58;
-            wave += Math.sin(2.0 * Math.PI * sweepB * t) * 0.28;
-            wave += Math.sin(2.0 * Math.PI * 1880.0 * t) * 0.12;
-            wave *= pulse;
-
-            double envelope = 1.0;
-            if (i < rampSamples) envelope = i / (double) rampSamples;
-            if (samples - i < rampSamples) envelope = (samples - i) / (double) rampSamples;
-
-            int value = (int) (wave * envelope * 30000.0);
-            if (value > Short.MAX_VALUE) value = Short.MAX_VALUE;
-            if (value < Short.MIN_VALUE) value = Short.MIN_VALUE;
-            buffer[i] = (short) value;
-        }
-        return buffer;
-    }
-
     private void playAlarm() {
         if (alarmPlaying) return;
         alarmPlaying = true;
@@ -145,7 +117,6 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             AudioTrack track = null;
             try {
-                final int sampleRate = 16000;
                 short[] samples;
                 if (alarmPcmBytes == null || alarmPcmBytes.length == 0) {
                     loadPcmAlarm();
@@ -153,18 +124,19 @@ public class MainActivity extends Activity {
                 if (alarmPcmBytes != null && alarmPcmBytes.length > 0) {
                     samples = pcmBytesToShorts(alarmPcmBytes);
                 } else {
-                    samples = makeEmergencyTone();
+                    runOnUiThread(() -> Toast.makeText(this, "Alarm audio file missing.", Toast.LENGTH_LONG).show());
+                    return;
                 }
 
                 int minBuffer = AudioTrack.getMinBufferSize(
-                        sampleRate,
+                        ALARM_SAMPLE_RATE,
                         AudioFormat.CHANNEL_OUT_MONO,
                         AudioFormat.ENCODING_PCM_16BIT
                 );
 
                 track = new AudioTrack(
                         AudioManager.STREAM_ALARM,
-                        sampleRate,
+                        ALARM_SAMPLE_RATE,
                         AudioFormat.CHANNEL_OUT_MONO,
                         AudioFormat.ENCODING_PCM_16BIT,
                         Math.max(minBuffer, samples.length * 2),
@@ -175,7 +147,7 @@ public class MainActivity extends Activity {
                 track.setStereoVolume(1.0f, 1.0f);
                 track.play();
 
-                long durationMs = Math.max(500, (long) ((samples.length / (double) sampleRate) * 1000.0));
+                long durationMs = Math.max(500, (long) ((samples.length / (double) ALARM_SAMPLE_RATE) * 1000.0));
                 Thread.sleep(durationMs + 250);
             } catch (Exception e) {
                 runOnUiThread(() -> Toast.makeText(this, "Could not play alarm.", Toast.LENGTH_LONG).show());
