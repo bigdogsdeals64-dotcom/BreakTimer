@@ -80,6 +80,8 @@ public class MainActivity extends Activity {
             startActivity(intent);
         } catch (ActivityNotFoundException e) {
             Toast.makeText(this, "No text messaging app found.", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "Could not open text message.", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -91,12 +93,9 @@ public class MainActivity extends Activity {
             Intent intent = new Intent(Intent.ACTION_SENDTO);
             intent.setData(Uri.parse("smsto:" + phones));
             intent.putExtra("sms_body", body);
-
-            if (intent.resolveActivity(getPackageManager()) != null) {
-                startActivity(intent);
-            } else {
-                Toast.makeText(this, "No text messaging app found.", Toast.LENGTH_LONG).show();
-            }
+            startActivity(intent);
+        } catch (ActivityNotFoundException e) {
+            Toast.makeText(this, "No text messaging app found.", Toast.LENGTH_LONG).show();
         } catch (Exception e) {
             Toast.makeText(this, "Could not open text message.", Toast.LENGTH_LONG).show();
         }
